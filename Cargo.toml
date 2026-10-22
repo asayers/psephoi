@@ -1,0 +1,18 @@
+[package]
+name = "psephoi"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aegis = { version = "0.9.20", features = ["aead"] }
+anyhow = "1.0.104"
+axum = "0.8.9"
+blake3 = { version = "1.8.7", features = ["digest", "serde"] }
+blind-rsa-signatures = "0.18.0"
+maud = { version = "0.27.0", features = ["axum"] }
+privacypass = "0.2.0-pre.3"
+rand = "0.10.3"
+roaring = "0.11.5"
+serde = { version = "1.0.229", features = ["derive"] }
+tls_codec = { version = "0.5.0", features = ["derive"] }
+tokio = { version = "1.54.1", features = ["full"] }
