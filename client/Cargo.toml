@@ -1,0 +1,31 @@
+[package]
+name = "client"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anyhow.workspace = true
+base64ct.workspace = true
+blake3.workspace = true
+blind-rsa-signatures.workspace = true
+console_error_panic_hook.workspace = true
+console_log.workspace = true
+getrandom = { workspace = true, features = ["wasm_js", "sys_rng"] }
+gloo-net.workspace = true
+gloo-storage.workspace = true
+jiff = { workspace = true, features = ["js"] }
+js-sys.workspace = true
+log.workspace = true
+maud.workspace = true
+psephoi.workspace = true
+rand.workspace = true
+tls_codec.workspace = true
+wasm-bindgen-futures.workspace = true
+wasm-bindgen.workspace = true
+web-sys = { workspace = true, features = ["Window", "Storage", "Request", "RequestInit", "Response", "Document", "HtmlInputElement"] }
+zerocopy.workspace = true
+gloo-utils = "0.3.0"
+gloo-events = "0.3.0"

@@ -1,0 +1,28 @@
+body {
+    max-width: 800px;
+    margin: auto;
+    padding: 1em;
+    text-align: justify;
+    hyphens: auto;
+    background: rgb(255, 250, 229);
+}
+header {
+    text-align: center;
+    margin-bottom: 2em;
+}
+footer {
+    text-align: center;
+    border-top: 2px solid black;
+    margin-top: 2em; padding: 1em;
+}
+
+/*
+pre { margin-left: 3em; }
+code { font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace; font-size: 85%; margin: 0; hyphens: manual; }
+
+table { border-collapse: collapse; margin: auto; }
+td, th { border-right: solid black 1px; border-left: solid black 1px; padding: 0.4em }
+th { border-bottom: solid black 1px; }
+td:first-of-type, td:last-of-type, th:first-of-type, th:last-of-type { border-left:none; border-right:none; }
+td { text-align: right; }
+*/

@@ -1,18 +1,42 @@
-[package]
-name = "psephoi"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+members = ["psephoi", "server", "client"]
+resolver = "3"
 
-[dependencies]
-aegis = { version = "0.9.20", features = ["aead"] }
+[profile.release]
+lto = true
+
+[profile.release.package.client]
+opt-level = "s"
+
+[profile.release.package.server]
+opt-level = 3
+
+[workspace.dependencies]
+aegis = "0.9.20"
 anyhow = "1.0.104"
 axum = "0.8.9"
-blake3 = { version = "1.8.7", features = ["digest", "serde"] }
+linearize = "0.1.8"
+base64ct = "1.8.3"
+blake3 = "1.8.7"
 blind-rsa-signatures = "0.18.0"
-maud = { version = "0.27.0", features = ["axum"] }
-privacypass = "0.2.0-pre.3"
+console_error_panic_hook = "0.1.7"
+console_log = "1.1.0"
+env_logger = "0.11.11"
+getrandom = "0.4"
+gloo-net = "0.7.0"
+gloo-storage = "0.4.0"
+jiff = "0.2.38"
+js-sys = "0.3"
+log = "0.4.34"
+maud = "0.27.0"
+psephoi = { path = "psephoi" }
 rand = "0.10.3"
 roaring = "0.11.5"
-serde = { version = "1.0.229", features = ["derive"] }
-tls_codec = { version = "0.5.0", features = ["derive"] }
-tokio = { version = "1.54.1", features = ["full"] }
+ron = "0.12.2"
+serde = "1.0.229"
+tls_codec = "0.5.0"
+tokio = "1.54.1"
+wasm-bindgen = "=0.2.129"
+wasm-bindgen-futures = "0.4"
+web-sys = "0.3"
+zerocopy = "0.8.63"
