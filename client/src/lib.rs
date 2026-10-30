@@ -455,7 +455,7 @@ pub async fn vote() -> Result<Vec<String>> {
             };
             // Record the intent to send, replace it with the actual receipt when we get it
             gloo_storage::LocalStorage::set(&storage_key, "leaked").unwrap();
-            let path = format!("/vote/{}", election);
+            let path = format!("/{election}/vote");
             info!("Sending chosen psephoi to ballot counter at {path}");
             let resp = Request::post(&path).body(req.to_bytes())?.send().await?;
             if !resp.ok() {
@@ -474,7 +474,7 @@ pub async fn vote() -> Result<Vec<String>> {
 
 pub async fn tally() -> Result<String> {
     let election = get_election().await?;
-    let path = format!("/results/{}", election);
+    let path = format!("/{election}/results");
     info!("Requesting results from {path}");
     let resp = Request::get(&path).send().await?;
     if !resp.ok() {
@@ -520,7 +520,7 @@ pub async fn verify_tally() -> Result<()> {
     let psephoi = retrive_psephoi().await?.context("Not registered")?;
     let manifest = get_manifest().await?;
 
-    let path = format!("/results/{}", election);
+    let path = format!("/{election}/results");
     // TODO: Re-use from tally()
     info!("Requesting results from {path}");
     let resp = Request::get(&path).send().await?;
