@@ -1,7 +1,7 @@
 use crate::{
     AppState, STATE_DIR, election::ElectionConfig, register::RegWalItem, vote::VoteWalItem,
 };
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, ensure};
 use axum::{extract::State, http::StatusCode, response::Redirect};
 use axum_extra::extract::Form;
 use base64ct::{Base64UrlUnpadded, Encoding};
@@ -13,6 +13,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tracing::error;
+
+const MAX_ELECTIONS: usize = 1000;
 
 #[derive(serde::Deserialize)]
 pub struct NewRequest {
@@ -78,6 +80,10 @@ fn create_election(config: ElectionConfig) -> Result<Election> {
 
 impl AppState {
     fn create_election(&mut self, config: ElectionConfig) -> Result<String> {
+        ensure!(
+            self.elections.len() < MAX_ELECTIONS,
+            "election limit reached"
+        );
         let hash = create_election(config)?;
         let estate = self
             .load_election(hash)?

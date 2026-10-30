@@ -35,6 +35,8 @@ impl ElectionConfig {
     ) -> Result<Self> {
         let durations = phase_durations(voting_period.clone(), allow_reg_while_voting)?;
 
+        let name = name.trim().to_string();
+        ensure!(!name.is_empty(), "Election has no name");
         ensure!(name.len() <= MAX_NAME_LEN, "Election name too long");
 
         ensure!(n_voters > 0, "No voters");
