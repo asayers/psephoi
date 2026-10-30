@@ -6,13 +6,13 @@ use axum::{extract::State, http::StatusCode, response::Redirect};
 use axum_extra::extract::Form;
 use base64ct::{Base64UrlUnpadded, Encoding};
 use jiff::{civil::Date, tz::TimeZone};
-use log::error;
 use psephoi::Election;
 use rustix::fs::{FallocateFlags, fallocate};
 use std::{
     fs::File,
     sync::{Arc, Mutex},
 };
+use tracing::error;
 
 #[derive(serde::Deserialize)]
 pub struct NewRequest {

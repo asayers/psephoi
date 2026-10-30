@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-aegis = { workspace = true, features = ["aead"] }
 anyhow.workspace = true
 axum.workspace = true
 axum-extra = { version = "0.12.6", features = ["form"] }
@@ -12,11 +11,9 @@ base64ct.workspace = true
 blake3.workspace = true
 blind-rsa-signatures.workspace = true
 constant_time_eq = "0.6.1"
-env_logger.workspace = true
 jiff = { workspace = true, features = ["serde"] }
 linearize.workspace = true
 listenfd = "1.0.2"
-log.workspace = true
 maud = { workspace = true, features = ["axum"] }
 mmap-snapshot = "0.3.0"
 psephoi.workspace = true
@@ -26,4 +23,7 @@ ron.workspace = true
 rustix = { version = "1.1.6", features = ["fs"] }
 serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["full"] }
+tower-http = { version = "0.7.1", features = ["set-header", "timeout", "trace"] }
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 zerocopy = { workspace = true, features = ["derive"] }

@@ -12,7 +12,6 @@ use axum::{
     response::Response,
 };
 use jiff::Timestamp;
-use log::warn;
 use psephoi::{RegRequest, RegResponse, RegToken};
 use roaring::RoaringBitmap;
 use rustix::fs::{FallocateFlags, fallocate, ftruncate};
@@ -22,6 +21,7 @@ use std::{
     num::NonZero,
     sync::{Arc, Mutex},
 };
+use tracing::warn;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, LittleEndian, U32};
 
 pub struct VoterId(pub NonZero<u32>);

@@ -6,8 +6,6 @@ An implementation of approval voting which is:
 * **Secret**: No-one else can tell how you voted (not even the server operator)
 * Relatively **low-tech**: It uses well-known crypto only
 
-These properties are in tension with each other, but I 
-
 ## Introduction
 
 ### Verifiable voting
@@ -167,18 +165,16 @@ by a _majority_ of registrars.
 
 ### Evil ballot counters
 
-What happens if you get to the end of the election and your vote _hasn't_ been
-included in the list? To be honest I'm not really sure what to do about this.
+When you submit your vote to the ballot counter it issues you a signed receipt.
+If you get to the end of the election and your vote _hasn't_ been included in
+the list, you can prove that it wasn't an innocent mistake by revealing your
+receipt.
 
-{%
-We could make this kind of mischeif detectable sooner, by having the counter
-issue a signed receipt when you submit your vote.  Then, if your tokens are
-missing from the final list you could publish the receipt and prove the list is
-bad.  But what if the counter simply refuses to take your tokens?  No receipt,
-nothing.  It's the same result, but you know about it sooner.  And these
-reciepts may open the door to easier vote buying, so I'm not sure it's a good
-idea.
-%}
+But what if the counter simply refuses to take your tokens?  No receipt,
+nothing.  Then you're stuck.  You might say that the receipts bought nothing;
+but they do make things slightly more awkward for an evil counter: they have to
+commit to being evil up-front, before they've seen the results of the election.
+Without the receipts the counter could wait and see.
 
 We could pull the same trick again, and have multiple ballot counters.  The
 final outcome of the election would be the union of the lists declared by all

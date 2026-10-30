@@ -19,6 +19,7 @@ pub struct ElectionConfig {
 
 const MAX_VOTERS: u32 = 200;
 const MAX_CANDIDATES: usize = 10;
+const MAX_NAME_LEN: usize = 100;
 const MAX_BYTES: usize = 1024 * 1024; // 1 MiB, enough for 200 voters and 10 candidates
 const MAX_VOTING_DURATION: Duration = Duration::from_secs(7 * 24 * 60 * 60); // ~1 week
 const MAX_REGISTERING_DURATION: Duration = Duration::from_secs(31 * 24 * 60 * 60); // ~1 month
@@ -33,6 +34,9 @@ impl ElectionConfig {
         allow_reg_while_voting: bool,
     ) -> Result<Self> {
         let durations = phase_durations(voting_period.clone(), allow_reg_while_voting)?;
+
+        ensure!(name.len() <= MAX_NAME_LEN, "Election name too long");
+
         ensure!(n_voters > 0, "No voters");
         ensure!(n_voters <= MAX_VOTERS, "Too many voters");
 
@@ -44,6 +48,10 @@ impl ElectionConfig {
         candidates.dedup();
         ensure!(!candidates.is_empty(), "No candidates");
         ensure!(candidates.len() <= MAX_CANDIDATES, "Too many candidates");
+        ensure!(
+            candidates.iter().all(|x| x.len() <= MAX_NAME_LEN),
+            "Candidate name too long"
+        );
 
         let costs = disk_usage(n_voters as usize, candidates.len());
         for p in Phase::variants() {

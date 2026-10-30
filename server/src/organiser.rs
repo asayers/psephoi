@@ -64,6 +64,7 @@ pub async fn organiser_get(
                 main {
                     (render_manifest(&manifest))
                     h2 { "Registration magic links" }
+                    p { "Distribute these links to the voters and ask them to register ASAP." }
                     ol {
                         @for (link, claimed) in links {
                             li { @if claimed { del { (link) } } @else { a href=(link) { (link) } } }

@@ -14,13 +14,14 @@ use crate::register::{RegHash, read_registrations, register_post, registrations_
 use crate::results::{manifest_get, nonces_get, results_get, sigs_get};
 use crate::vote::{read_votes, vote_post};
 use anyhow::{Context, Result};
+use axum::extract::{DefaultBodyLimit, MatchedPath};
+use axum::http::{HeaderValue, header};
 use axum::{
     Router,
     extract::Path,
     http::StatusCode,
     routing::{get, post},
 };
-use log::info;
 use maud::{Markup, PreEscaped, html};
 use psephoi::*;
 use roaring::RoaringBitmap;
@@ -31,6 +32,11 @@ use std::path::PathBuf;
 use std::sync::LazyLock;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
+use tower_http::set_header::SetResponseHeaderLayer;
+use tower_http::timeout::TimeoutLayer;
+use tower_http::trace::TraceLayer;
+use tracing::info;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Default)]
 pub struct AppState {
@@ -132,7 +138,10 @@ static STATE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    env_logger::init();
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .without_time()
+        .init();
 
     let state = Arc::new(Mutex::new(AppState::default()));
 
@@ -149,7 +158,30 @@ async fn main() -> Result<()> {
         .route("/{election}/nonces/{i}", get(nonces_get))
         .route("/{election}/sigs/{i}", get(sigs_get))
         .route("/{election}", get(election_get))
-        .with_state(state);
+        .with_state(state)
+        .layer(DefaultBodyLimit::max(8 * 1024))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            std::time::Duration::from_secs(10),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-store"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::REFERRER_POLICY,
+            HeaderValue::from_static("no-referrer"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|req: &axum::extract::Request| {
+                let path = req.extensions().get::<MatchedPath>().map(|p| p.as_str());
+                tracing::info_span!("req", method = %req.method(), path)
+            }),
+        );
 
     let mut fds = listenfd::ListenFd::from_env();
     match fds.take_unix_listener(0)? {

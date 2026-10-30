@@ -8,7 +8,6 @@ use gloo_storage::Storage;
 use gloo_utils::document;
 use gloo_utils::window;
 use jiff::Timestamp;
-use log::info;
 use maud::html;
 use psephoi::{
     Election, ElectionManifest, ElectionResults, NONCE_LEN, Psephoi, Psephos, PublicKey,
@@ -20,6 +19,9 @@ use rand::seq::SliceRandom;
 use tls_codec::{
     Deserialize, Serialize, TlsByteVecU16, TlsDeserialize, TlsSerialize, TlsSize, TlsVecU16,
 };
+use tracing::info;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -32,7 +34,18 @@ pub async fn init() -> Result<(), JsError> {
 }
 
 pub async fn init_() -> Result<()> {
-    console_log::init_with_level(log::Level::Debug).unwrap();
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_ansi(false) // Only partially supported across browsers
+        .without_time() // std::time is not available in browsers
+        .with_writer(tracing_web::MakeWebConsoleWriter::new()); // write events to the console
+    let perf_layer = tracing_web::performance_layer()
+        .with_details_from_fields(tracing_subscriber::fmt::format::Pretty::default());
+
+    tracing_subscriber::registry()
+        .with(fmt_layer)
+        .with(perf_layer)
+        .init();
+
     console_error_panic_hook::set_once();
     info!("Psephoi client is up and running!");
     let manifest = get_manifest().await?;
@@ -222,7 +235,7 @@ async fn render() -> Result<()> {
                 p .status { "Loading..." }
                 button #btn-fetch disabled { "Fetch" }
                 button #btn-verify disabled { "Verify" }
-                button #btn-full-verify disabled { "Fully verify" }
+                button #btn-audit disabled { "Audit" }
             }
             (render_manifest(&manifest))
         }
@@ -494,21 +507,24 @@ pub async fn tally() -> Result<String> {
         total += c.tally;
     }
     let verify_button = document().get_element_by_id("btn-verify").unwrap();
-    let full_verify_button = document().get_element_by_id("btn-full-verify").unwrap();
+    let full_verify_button = document().get_element_by_id("btn-audit").unwrap();
     verify_button.remove_attribute("disabled").js()?;
     full_verify_button.remove_attribute("disabled").js()?;
     verify_button
         .set_attribute(
             "title",
-            &format!("requires downloading {}B", total as usize * NONCE_LEN),
+            &format!(
+                "Verify that your vote is correctly counted.  Requires downloading {} MiB",
+                total as usize * NONCE_LEN / 1024 / 1024
+            ),
         )
         .js()?;
     full_verify_button
         .set_attribute(
             "title",
             &format!(
-                "requires downloading {}B",
-                total as usize * (NONCE_LEN + SIG_LEN)
+                "Verify the validity of the entire set of votes.  Requires downloading {} MiB",
+                total as usize * (NONCE_LEN + SIG_LEN) / 1024 / 1024
             ),
         )
         .js()?;

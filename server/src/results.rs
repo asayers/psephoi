@@ -7,7 +7,7 @@ use axum::{
 };
 use jiff::Timestamp;
 use psephoi::{CandidateResults, Election, ElectionResults};
-use rustix::fs::{AtFlags, OFlags, linkat, open};
+use rustix::fs::{AtFlags, OFlags, fsync, linkat, open};
 use std::{
     fs::{File, Permissions},
     io::{ErrorKind, Write},

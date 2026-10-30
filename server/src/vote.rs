@@ -6,7 +6,6 @@ use axum::{
     http::StatusCode,
 };
 use jiff::Timestamp;
-use log::warn;
 use psephoi::{Election, NONCE_LEN, Psephos, SIG_LEN, VoteRequest, VoteResponse};
 use rustix::fs::{FallocateFlags, fallocate, ftruncate};
 use std::{
@@ -15,6 +14,7 @@ use std::{
     io::Write,
     sync::{Arc, Mutex},
 };
+use tracing::warn;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub fn read_votes(
