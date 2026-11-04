@@ -61,9 +61,8 @@ pub async fn render() -> Result<Markup> {
         }
     } else if now > voting.start {
         let vote = released_psephoi().await?;
-        if retrieve_psephoi().await?.is_none()
-            || manifest.reg_while_voting == RegWhileVoting::Disallow
-        {
+        let is_registered = retrieve_psephoi().await?.is_some();
+        if !is_registered && manifest.reg_while_voting == RegWhileVoting::Disallow {
             html! {
                 fieldset disabled #vote {
                     legend { "Vote" }
@@ -79,7 +78,6 @@ pub async fn render() -> Result<Markup> {
                 }
             }
         } else {
-            // TODO: Just auto-register when they hit "vote"
             let txt = if vote.is_empty() {
                 "Ready to vote.  Vote for as many as you like."
             } else {
@@ -87,13 +85,20 @@ pub async fn render() -> Result<Markup> {
                 expand your selection; once you vote for a candidate, you \
                 can't take it back."
             };
+            // TODO: Hide previous selection until they click a button
             html! {
                 fieldset #vote {
                     legend { "Vote" }
                     span { (txt) }
+                    @if !is_registered {
+                        p .warning { strong {"Warning:"}
+                        " You haven't registered yet.  This election allows late \
+                        registration, but doing this compromises the secrecy \
+                        of your vote." }
+                    }
                     @for (i, c) in &candidates {
                         div {
-                            input type="checkbox" id={"candidate-" (i)} name=(c) value=(vote.contains(c))
+                            input type="checkbox" id={"candidate-" (i)} name=(c) checked[vote.contains(c)] disabled[vote.contains(c)]
                             label for={"candidate-" (i)} { (c) }
                         }
                     }
@@ -146,7 +151,7 @@ pub async fn render() -> Result<Markup> {
             span .emoji { (election.emoji()) }
         } }
         main {
-            p #status-box { "Loading..." }
+            p #status-box { "" }
             (main)
             (render_manifest(&manifest))
         }

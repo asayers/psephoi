@@ -37,9 +37,9 @@ enum Button {
 
 pub async fn wire_up_buttons() {
     for button in Button::variants() {
-        let el = document()
-            .get_element_by_id(&format!("btn-{button:?}"))
-            .unwrap();
+        let Some(el) = document().get_element_by_id(&format!("btn-{button:?}")) else {
+            continue;
+        };
         EventListener::new(&el.clone(), "click", move |_| {
             el.set_attribute("disabled", "").unwrap();
             let status = match button {
@@ -58,10 +58,12 @@ pub async fn wire_up_buttons() {
                     Button::Audit => audit().await,
                 };
                 match res {
-                    Ok(_) => {
+                    Ok(true) => {
                         let markup = render().await.unwrap();
                         body().unwrap().set_inner_html(&markup.into_string());
+                        wire_up_buttons().await;
                     }
+                    Ok(false) => (), // Don't re-render
                     Err(e) => {
                         status_box().set_text_content(Some(&format!("{e:#}")));
                         // Assume the error is transient, let the user retry
@@ -74,7 +76,7 @@ pub async fn wire_up_buttons() {
     }
 }
 
-async fn register() -> Result<()> {
+async fn register() -> Result<bool> {
     let election = election().await?;
 
     ensure!(
@@ -143,10 +145,10 @@ async fn register() -> Result<()> {
     );
     let storage_key = format!("psephoi_{}", election);
     gloo_storage::LocalStorage::set(storage_key, encoded).unwrap();
-    Ok(())
+    Ok(true)
 }
 
-async fn vote() -> Result<()> {
+async fn vote() -> Result<bool> {
     let election = election().await?;
     let manifest = get_manifest().await?;
     let psephoi = match (retrieve_psephoi().await?, manifest.reg_while_voting) {
@@ -186,10 +188,10 @@ async fn vote() -> Result<()> {
             gloo_storage::LocalStorage::set(storage_key, encoded).unwrap();
         }
     }
-    Ok(())
+    Ok(true)
 }
 
-async fn verify() -> Result<()> {
+async fn verify() -> Result<bool> {
     let election = election().await?;
     let psephoi = retrieve_psephoi().await?.context("Not registered")?;
     let manifest = get_manifest().await?;
@@ -233,9 +235,9 @@ async fn verify() -> Result<()> {
         };
         status.set_text_content(Some(&txt));
     }
-    Ok(())
+    Ok(false)
 }
 
-async fn audit() -> Result<()> {
+async fn audit() -> Result<bool> {
     bail!("Not implemented yet")
 }
