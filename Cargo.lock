@@ -257,6 +257,7 @@ dependencies = [
  "gloo-utils",
  "jiff",
  "js-sys",
+ "linearize",
  "maud",
  "psephoi",
  "rand 0.10.3",
