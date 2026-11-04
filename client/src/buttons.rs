@@ -16,6 +16,7 @@ use gloo_utils::document;
 use gloo_utils::window;
 use linearize::Linearize;
 use linearize::LinearizeExt;
+use psephoi::RegWhileVoting;
 use psephoi::{
     NONCE_LEN, Psephoi, Psephos, PublicKey, RegRequest, RegResponse, RegToken, VoteRequest,
     VoteResponse,
@@ -147,7 +148,15 @@ async fn register() -> Result<()> {
 
 async fn vote() -> Result<()> {
     let election = election().await?;
-    let psephoi = retrieve_psephoi().await?.context("Not registered")?;
+    let manifest = get_manifest().await?;
+    let psephoi = match (retrieve_psephoi().await?, manifest.reg_while_voting) {
+        (Some(x), _) => x,
+        (None, RegWhileVoting::Disallow) => bail!("Not registered"),
+        (None, RegWhileVoting::Allow) => {
+            register().await?;
+            retrieve_psephoi().await?.unwrap()
+        }
+    };
     for (i, p) in psephoi.0.iter().enumerate() {
         let checkbox = document()
             .get_element_by_id(&format!("candidate-{i}"))
