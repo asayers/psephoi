@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, anyhow, bail, ensure};
+use async_once_cell::OnceCell;
 use base64ct::{Base64UrlUnpadded, Encoding};
 use blake3::Hash;
 use blind_rsa_signatures::{BlindMessage, BlindingResult, Secret};
@@ -248,19 +249,24 @@ async fn render() -> Result<()> {
     Ok(())
 }
 
-async fn get_manifest() -> Result<ElectionManifest> {
-    let election = get_election().await?;
-    let path = format!("/{election}/manifest");
-    info!("Requesting manifest from {path}");
-    let resp = Request::get(&path).send().await.unwrap();
-    if !resp.ok() {
-        let err = resp.text().await.unwrap();
-        bail!("{err}");
-    }
-    let manifest = resp.binary().await.unwrap();
-    let actual = blake3::hash(&manifest);
-    ensure!(actual == election.0, "Manifest is corrupt");
-    Ok(ElectionManifest::from_bytes(&manifest).unwrap())
+async fn get_manifest() -> Result<&'static ElectionManifest> {
+    static MANIFEST: OnceCell<ElectionManifest> = OnceCell::new();
+    MANIFEST
+        .get_or_try_init(async {
+            let election = get_election().await?;
+            let path = format!("/{election}/manifest");
+            info!("Requesting manifest from {path}");
+            let resp = Request::get(&path).send().await.unwrap();
+            if !resp.ok() {
+                let err = resp.text().await.unwrap();
+                bail!("{err}");
+            }
+            let manifest = resp.binary().await.unwrap();
+            let actual = blake3::hash(&manifest);
+            ensure!(actual == election.0, "Manifest is corrupt");
+            Ok(ElectionManifest::from_bytes(&manifest).unwrap())
+        })
+        .await
 }
 
 async fn retrive_psephoi() -> Result<Option<Psephoi>> {
