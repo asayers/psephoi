@@ -1,26 +1,92 @@
 use crate::{
-    AppState, STATE_DIR, election::ElectionConfig, register::RegWalItem, vote::VoteWalItem,
+    AppState, STATE_DIR, election::ElectionConfig, head, register::RegWalItem, vote::VoteWalItem,
 };
 use anyhow::{Context, Result, ensure};
 use axum::{extract::State, http::StatusCode, response::Redirect};
 use axum_extra::extract::Form;
 use base64ct::{Base64UrlUnpadded, Encoding};
-use jiff::{civil::Date, tz::TimeZone};
+use jiff::{civil::DateTime, tz::TimeZone};
+use maud::{Markup, html};
 use psephoi::Election;
 use rustix::fs::{FallocateFlags, fallocate};
 use std::{
     fs::File,
-    sync::{Arc, Mutex},
+    sync::{Arc, LazyLock, Mutex},
 };
 use tracing::error;
 
 const MAX_ELECTIONS: usize = 1000;
 
+pub async fn new_get() -> Markup {
+    static RET: LazyLock<Markup> = LazyLock::new(|| {
+        html! {
+            (maud::DOCTYPE)
+            html lang="en" {
+                head { (head("New election")) }
+                body {
+                    header { h1 { "New election" } }
+                    main {
+                        form method="post" {
+                            div {
+                            input id="election_name" name="name" type="text"
+                            label for="election_name" { "Name" }
+                            }
+                            div {
+                            input id="n_voters" name="n_voters" type="number"
+                            label for="n_voters" { "# Voters" }
+                            }
+                            div {
+                            input id="voting_starts" name="voting_starts" type="datetime-local"
+                            label for="voting_starts" { "Voting starts" }
+                            }
+                            div {
+                            input id="voting_ends" name="voting_ends" type="datetime-local"
+                            label for="voting_ends" { "Voting ends" }
+                            }
+                            div {
+                            input id="timezone" name="timezone" type="text" value="Asia/Tokyo"
+                            label for="timezone" { "Timezone" }
+                            }
+
+                            p { "Candidates" }
+                            ul {
+                                li { input name="candidate" type="text"; }
+                                li { input name="candidate" type="text"; }
+                                li { input name="candidate" type="text"; }
+                                li { input name="candidate" type="text"; }
+                                li { input name="candidate" type="text"; }
+                                li { input name="candidate" type="text"; }
+                                li { input name="candidate" type="text"; }
+                                li { input name="candidate" type="text"; }
+                                li { input name="candidate" type="text"; }
+                                li { input name="candidate" type="text"; }
+                            }
+
+                            div {
+                            input id="allow_reg_while_voting" name="allow_reg_while_voting" type="checkbox" value="true"
+                            label for="allow_reg_while_voting" {
+                                "Allow registration after voting has begun."
+                                b{"Warning:"} " reduces privacy. If a user
+                                registers and then immediately votes, it's easy
+                                to tell who they voted for." }
+                            }
+
+                            button { "Create" }
+                        }
+                    }
+                }
+            }
+        }
+    });
+    RET.clone()
+}
+
 #[derive(serde::Deserialize)]
 pub struct NewRequest {
     name: String,
     n_voters: u32,
-    election_day: Date,
+    voting_starts: DateTime,
+    voting_ends: DateTime,
     timezone: String,
     candidate: Vec<String>,
     #[serde(default)]
@@ -36,10 +102,13 @@ pub async fn new_post(
     Form(req): Form<NewRequest>,
 ) -> Result<Redirect, (StatusCode, String)> {
     let tz = TimeZone::get(&req.timezone).map_err(bad_req)?;
-    let day = req.election_day.to_zoned(tz).map_err(bad_req)?;
-    let start_of_day = day.timestamp();
-    let end_of_day = day.tomorrow().map_err(bad_req)?.timestamp();
-    let voting_period = start_of_day..end_of_day;
+    let voting_starts = req
+        .voting_starts
+        .to_zoned(tz.clone())
+        .map_err(bad_req)?
+        .timestamp();
+    let voting_ends = req.voting_ends.to_zoned(tz).map_err(bad_req)?.timestamp();
+    let voting_period = voting_starts..voting_ends;
     let config = ElectionConfig::new(
         req.name,
         req.candidate,

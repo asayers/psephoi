@@ -8,7 +8,7 @@ mod vote;
 
 use crate::assets::{Asset, asset_url, static_asset};
 use crate::election::ElectionConfig;
-use crate::new::new_post;
+use crate::new::{new_get, new_post};
 use crate::organiser::organiser_get;
 use crate::register::{RegHash, read_registrations, register_post, registrations_get};
 use crate::results::{manifest_get, nonces_get, results_get, sigs_get};
@@ -147,6 +147,7 @@ async fn main() -> Result<()> {
 
     let app = Router::new()
         .route("/", get(root))
+        .route("/favicon.ico", get((StatusCode::NOT_FOUND, "")))
         .route("/new", get(new_get).post(new_post))
         .route("/assets/{hash}", get(static_asset))
         .route("/{election}/manifest", get(manifest_get))
@@ -200,64 +201,6 @@ async fn main() -> Result<()> {
     }
 }
 
-pub async fn new_get() -> Markup {
-    static RET: LazyLock<Markup> = LazyLock::new(|| {
-        html! {
-            (maud::DOCTYPE)
-            html lang="en" {
-                head { (head("New election")) }
-                body {
-                    header { h1 { "New election" } }
-                    main {
-                        form method="post" {
-                            div {
-                            input id="election_name" name="name" type="text"
-                            label for="election_name" { "Name" }
-                            }
-                            div {
-                            input id="n_voters" name="n_voters" type="number"
-                            label for="n_voters" { "# Voters" }
-                            }
-                            div {
-                            input id="election_day" name="election_day" type="date"
-                            label for="election_day" { "Election day" }
-                            }
-                            div {
-                            input id="timezone" name="timezone" type="text"
-                            label for="timezone" { "Timezone" }
-                            }
-                            div {
-                            input id="allow_reg_while_voting" name="allow_reg_while_voting" type="checkbox" value="true"
-                            label for="allow_reg_while_voting" { "Allow registration after voting has begun" }
-                            p { b{"Warning:"} " reduces privacy. If a user registers
-                            and then immediately votes, it's easy to tell who
-                            they voted for." }
-                            }
-
-                            p { "Candidates" }
-                            ul {
-                                li { input name="candidate" type="text"; }
-                                li { input name="candidate" type="text"; }
-                                li { input name="candidate" type="text"; }
-                                li { input name="candidate" type="text"; }
-                                li { input name="candidate" type="text"; }
-                                li { input name="candidate" type="text"; }
-                                li { input name="candidate" type="text"; }
-                                li { input name="candidate" type="text"; }
-                                li { input name="candidate" type="text"; }
-                                li { input name="candidate" type="text"; }
-                            }
-
-                            button { "Create" }
-                        }
-                    }
-                }
-            }
-        }
-    });
-    RET.clone()
-}
-
 pub fn head(title: &str) -> Markup {
     html! {
         meta charset="utf-8";
@@ -268,8 +211,10 @@ pub fn head(title: &str) -> Markup {
 }
 
 pub async fn election_get(Path(election): Path<Election>) -> Result<Markup, (StatusCode, String)> {
-    let exists = std::fs::exists(STATE_DIR.join(election.to_string())).is_ok_and(|x| x);
+    let path = STATE_DIR.join(election.to_string());
+    let exists = std::fs::exists(&path).is_ok_and(|x| x);
     if !exists {
+        info!(path = %path.display(), "Couldn't find election");
         return Err((StatusCode::NOT_FOUND, format!("{election} not found")));
     }
     let importmap = format!(
