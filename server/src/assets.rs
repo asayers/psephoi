@@ -1,6 +1,6 @@
 use axum::{
     extract::Path,
-    http::{StatusCode, header},
+    http::{HeaderMap, StatusCode, header},
     response::Response,
 };
 use base64ct::{Base64UrlUnpadded, Encoding};
@@ -9,6 +9,8 @@ use std::sync::LazyLock;
 
 static WASM: &[u8] = include_bytes!(concat!(env!("PSEPHOI_CLIENT_DIR"), "/client_bg.wasm"));
 static JS: &[u8] = include_bytes!(concat!(env!("PSEPHOI_CLIENT_DIR"), "/client.js"));
+static WASM_GZ: &[u8] = include_bytes!(concat!(env!("PSEPHOI_CLIENT_DIR"), "/client_bg.wasm.gz"));
+static JS_GZ: &[u8] = include_bytes!(concat!(env!("PSEPHOI_CLIENT_DIR"), "/client.js.gz"));
 static CSS: &[u8] = include_bytes!("../../static/style.css");
 static APP: &[u8] = include_bytes!("../../static/app.js");
 
@@ -21,18 +23,47 @@ pub enum Asset {
     Glue,
 }
 
-static ASSETS: &StaticCopyMap<Asset, (&[u8], &str, &str)> = StaticCopyMap::from_ref(&[
-    (CSS, "css", "text/css"),
-    (WASM, "wasm", "application/wasm"),
-    (JS, "js", "text/javascript"),
-    (APP, "js", "text/javascript"),
+#[derive(Copy, Clone, Debug)]
+struct AssetInfo {
+    raw: &'static [u8],
+    gzipped: Option<&'static [u8]>,
+    ext: &'static str,
+    mime: &'static str,
+}
+
+static ASSETS: &StaticCopyMap<Asset, AssetInfo> = StaticCopyMap::from_ref(&[
+    AssetInfo {
+        raw: CSS,
+        gzipped: None,
+        ext: "css",
+        mime: "text/css",
+    },
+    AssetInfo {
+        raw: WASM,
+        gzipped: Some(WASM_GZ),
+        ext: "wasm",
+        mime: "application/wasm",
+    },
+    AssetInfo {
+        raw: JS,
+        gzipped: Some(JS_GZ),
+        ext: "js",
+        mime: "text/javascript",
+    },
+    AssetInfo {
+        raw: APP,
+        gzipped: None,
+        ext: "js",
+        mime: "text/javascript",
+    },
 ]);
 
 static ASSET_NAMES: LazyLock<StaticMap<Asset, String>> = LazyLock::new(|| {
-    ASSETS.into_static_map().map_values(|(data, ext, _)| {
+    ASSETS.into_static_map().map_values(|info| {
         format!(
-            "{}.{ext}",
-            Base64UrlUnpadded::encode_string(blake3::hash(data).as_bytes())
+            "{}.{}",
+            Base64UrlUnpadded::encode_string(blake3::hash(info.raw).as_bytes()),
+            info.ext
         )
     })
 });
@@ -41,10 +72,10 @@ pub fn asset_url(asset: Asset) -> String {
     format!("/assets/{}", ASSET_NAMES[asset])
 }
 
-pub async fn static_asset(Path(fname): Path<String>) -> Response {
+pub async fn static_asset(headers: HeaderMap, Path(fname): Path<String>) -> Response {
     let Some(asset) = ASSET_NAMES
         .iter()
-        .find_map(|(a, x)| (x == &fname).then_some(a))
+        .find_map(|(a, x)| (x == &fname).then_some(ASSETS[a]))
     else {
         return Response::builder()
             .status(StatusCode::NOT_FOUND)
@@ -52,11 +83,23 @@ pub async fn static_asset(Path(fname): Path<String>) -> Response {
             .unwrap();
     };
 
-    let (data, _, mime) = ASSETS[asset];
+    let accepts_gzip = headers
+        .get_all(header::ACCEPT_ENCODING)
+        .iter()
+        .flat_map(|x| x.to_str().unwrap_or_default().split(','))
+        .find(|x| x.trim_start().starts_with("gzip"))
+        .is_some();
 
-    Response::builder()
+    let bldr = Response::builder()
         .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
-        .header(header::CONTENT_TYPE, mime)
-        .body(data.into())
-        .unwrap()
+        .header(header::CONTENT_TYPE, asset.mime)
+        .header(header::VARY, "accept-encoding");
+
+    if accepts_gzip && let Some(data_gz) = asset.gzipped {
+        bldr.header(header::CONTENT_ENCODING, "gzip")
+            .body(data_gz.into())
+            .unwrap()
+    } else {
+        bldr.body(asset.raw.into()).unwrap()
+    }
 }

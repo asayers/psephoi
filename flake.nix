@@ -47,6 +47,7 @@
             wasm-bindgen --target web --out-dir $out \
               target/wasm32-unknown-unknown/release/client.wasm
             wasm-opt -Os $out/client_bg.wasm -o $out/client_bg.wasm
+            gzip -9 -n -k $out/client_bg.wasm $out/client.js
             runHook postBuild
           '';
           dontInstall = true;
