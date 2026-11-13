@@ -6,7 +6,6 @@ use blake3::Hash;
 use gloo_net::http::Request;
 use gloo_utils::window;
 use psephoi::{Election, ElectionManifest, ElectionResults};
-use tracing::info;
 
 pub async fn election() -> Result<Election> {
     static ELECTION: OnceCell<Election> = OnceCell::new();
@@ -32,7 +31,6 @@ pub async fn get_manifest() -> Result<&'static ElectionManifest> {
         .get_or_try_init(async {
             let election = election().await?;
             let path = format!("/{election}/manifest");
-            info!("Requesting manifest from {path}");
             let resp = Request::get(&path).send().await.unwrap();
             if !resp.ok() {
                 let err = resp.text().await.unwrap();
@@ -52,7 +50,6 @@ pub async fn get_results() -> Result<&'static ElectionResults> {
         .get_or_try_init(async {
             let election = election().await?;
             let path = format!("/{election}/results");
-            info!("Requesting results from {path}");
             let resp = Request::get(&path).send().await?;
             if !resp.ok() {
                 let err = resp.text().await?;

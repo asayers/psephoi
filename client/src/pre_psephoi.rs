@@ -7,7 +7,6 @@ use psephoi::NONCE_LEN;
 use tls_codec::{
     Deserialize, Serialize, TlsByteVecU16, TlsDeserialize, TlsSerialize, TlsSize, TlsVecU16,
 };
-use tracing::info;
 
 #[derive(Clone, TlsSerialize, TlsDeserialize, TlsSize)]
 pub struct PrePsephos {
@@ -46,7 +45,6 @@ pub async fn ensure_pre_psephoi_exist() -> Result<()> {
 
     let storage_key = format!("pre_psephoi_{}", election);
     if gloo_storage::LocalStorage::get::<String>(&storage_key).is_ok() {
-        info!("Pre-psephoi for this election already in local storage");
         return Ok(());
     }
 
@@ -56,7 +54,6 @@ pub async fn ensure_pre_psephoi_exist() -> Result<()> {
             token
         })
         .collect::<Vec<_>>();
-    info!("Generated {} tokens", manifest.candidates.len());
     let pre_psephoi = manifest
         .candidates
         .iter()
@@ -67,7 +64,6 @@ pub async fn ensure_pre_psephoi_exist() -> Result<()> {
             Ok(PrePsephos::new(*token, res))
         })
         .collect::<Result<TlsVecU16<_>>>()?;
-    info!("Blinded the tokens");
     let encoded = Base64UrlUnpadded::encode_string(&pre_psephoi.tls_serialize_detached()?);
     gloo_storage::LocalStorage::set(storage_key, encoded).unwrap();
     Ok(())

@@ -13,9 +13,6 @@ use gloo_storage::Storage;
 use gloo_utils::document;
 use psephoi::Psephoi;
 use tls_codec::Deserialize;
-use tracing::info;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use web_sys::Element;
@@ -26,20 +23,7 @@ pub async fn init() -> Result<(), JsError> {
 }
 
 pub async fn init_() -> Result<()> {
-    let fmt_layer = tracing_subscriber::fmt::layer()
-        .with_ansi(false) // Only partially supported across browsers
-        .without_time() // std::time is not available in browsers
-        .with_writer(tracing_web::MakeWebConsoleWriter::new()); // write events to the console
-    let perf_layer = tracing_web::performance_layer()
-        .with_details_from_fields(tracing_subscriber::fmt::format::Pretty::default());
-
-    tracing_subscriber::registry()
-        .with(fmt_layer)
-        .with(perf_layer)
-        .init();
-
     console_error_panic_hook::set_once();
-    info!("Psephoi client is up and running!");
 
     let manifest = get_manifest().await?;
     document().set_title(manifest.name());

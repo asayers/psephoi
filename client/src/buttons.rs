@@ -21,7 +21,6 @@ use psephoi::{
     NONCE_LEN, Psephoi, Psephos, PublicKey, RegRequest, RegResponse, RegToken, VoteRequest,
     VoteResponse,
 };
-use tracing::info;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
@@ -103,7 +102,6 @@ async fn register() -> Result<bool> {
         blinded_numbers,
     };
     let path = format!("/{election}/register");
-    info!("Sending blinded tokens to registrar at {path}");
     let resp = Request::post(&path).body(req.to_bytes())?.send().await?;
     if !resp.ok() {
         let err = resp.text().await?;
@@ -112,7 +110,6 @@ async fn register() -> Result<bool> {
     let resp = resp.binary().await?;
     let resp = RegResponse::from_bytes(&resp)?;
     assert!(resp.blinded_sigs.len() == req.blinded_numbers.len());
-    info!("Got response");
     let psephoi = Psephoi(
         manifest
             .candidates
@@ -120,7 +117,6 @@ async fn register() -> Result<bool> {
             .zip(pre_psephoi.iter())
             .zip(resp.blinded_sigs.iter())
             .map(|((c, pre_phephos), sig)| {
-                info!("Unblinding token for {}...", c.name());
                 let pk = PublicKey::from_spki(c.pubkey.as_slice())?;
                 let sig = blind_rsa_signatures::BlindSignature(sig.into());
                 let res = pre_phephos.clone().into();
@@ -133,16 +129,11 @@ async fn register() -> Result<bool> {
                         .try_into()
                         .map_err(|_| anyhow!("sig was wrong length"))?,
                 };
-                info!("Got a psephos");
                 anyhow::Ok(psephos)
             })
             .collect::<Result<_>>()?,
     );
     let encoded = Base64UrlUnpadded::encode_string(&psephoi.to_bytes());
-    info!(
-        "Successfully registered!  Here are your psephoi:\n{}",
-        encoded
-    );
     let storage_key = format!("psephoi_{}", election);
     gloo_storage::LocalStorage::set(storage_key, encoded).unwrap();
     Ok(true)
@@ -175,7 +166,6 @@ async fn vote() -> Result<bool> {
             // Record the intent to send, replace it with the actual receipt when we get it
             gloo_storage::LocalStorage::set(&storage_key, "leaked").unwrap();
             let path = format!("/{election}/vote");
-            info!("Sending chosen psephoi to ballot counter at {path}");
             let resp = Request::post(&path).body(req.to_bytes())?.send().await?;
             if !resp.ok() {
                 let err = resp.text().await?;
