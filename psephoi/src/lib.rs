@@ -3,8 +3,8 @@ use base64ct::{Base64UrlUnpadded, Encoding};
 use blake3::Hash;
 use blind_rsa_signatures::{Deterministic, PSS, Sha384};
 use core::fmt;
-use jiff::Timestamp;
 use linearize::Linearize;
+#[cfg(any(feature = "jiff", feature = "js-sys"))]
 use maud::{Markup, html};
 use rand::rng;
 use std::ops::Range;
@@ -44,10 +44,38 @@ pub struct ElectionManifest {
     // Sorted alphabetically by candidate name
     pub candidates: TlsVecU16<CandidateManifest>,
     pub n_voters: u32,
-    pub voting_start: u64, // epoch secs
-    pub voting_end: u64,   // epoch secs
+    pub voting_start: UnixSeconds,
+    pub voting_end: UnixSeconds,
     pub reg_while_voting: RegWhileVoting,
     // TODO: Counter pubkey
+}
+
+#[derive(
+    Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, TlsSerialize, TlsDeserialize, TlsSize,
+)]
+pub struct UnixSeconds(pub u64);
+
+#[cfg(all(target_arch = "wasm32", feature = "js-sys"))]
+impl fmt::Display for UnixSeconds {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use js_sys::wasm_bindgen::JsValue;
+        let d = js_sys::Date::new(&JsValue::from_f64(self.0 as f64 * 1000.0));
+        let s: String = d.to_locale_string("default", &JsValue::UNDEFINED).into();
+        f.write_str(&s)
+    }
+}
+#[cfg(all(not(target_arch = "wasm32"), feature = "jiff"))]
+impl fmt::Display for UnixSeconds {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        jiff::Timestamp::from_second(self.0 as i64).unwrap().fmt(f)
+    }
+}
+
+#[cfg(feature = "js-sys")]
+impl UnixSeconds {
+    pub fn now() -> Self {
+        UnixSeconds((js_sys::Date::now() / 1000.0) as u64)
+    }
 }
 
 /// Does this election allow registration to continue during the voting period?
@@ -203,17 +231,15 @@ impl ElectionManifest {
         str::from_utf8(self.name.as_slice()).unwrap()
     }
 
-    pub fn registration_closes(&self) -> Timestamp {
-        Timestamp::from_second(match self.reg_while_voting {
+    pub fn registration_closes(&self) -> UnixSeconds {
+        match self.reg_while_voting {
             RegWhileVoting::Disallow => self.voting_start,
             RegWhileVoting::Allow => self.voting_end,
-        } as i64)
-        .unwrap()
+        }
     }
 
-    pub fn voting_period(&self) -> Range<Timestamp> {
-        Timestamp::from_second(self.voting_start as i64).unwrap()
-            ..Timestamp::from_second(self.voting_end as i64).unwrap()
+    pub fn voting_period(&self) -> Range<UnixSeconds> {
+        self.voting_start..self.voting_end
     }
 }
 
@@ -388,6 +414,7 @@ pub struct CandidateResults {
     // pub tree: [u8; 32],
 }
 
+#[cfg(any(feature = "jiff", feature = "js-sys"))]
 pub fn render_manifest(manifest: &ElectionManifest) -> Markup {
     html! {
         details {
@@ -396,8 +423,8 @@ pub fn render_manifest(manifest: &ElectionManifest) -> Markup {
                 tr { td { b { "Election ID" } } td { pre { (manifest.hash()) } } }
                 tr { td { b { "Name" } } td { (manifest.name()) } }
                 tr { td { b { "Registration closes" } } td { (manifest.registration_closes().to_string()) } }
-                tr { td { b { "Voting starts" } } td { (manifest.voting_period().start.to_string()) } }
-                tr { td { b { "Voting ends" } } td { (manifest.voting_period().end.to_string()) } }
+                tr { td { b { "Voting starts" } } td { (manifest.voting_start.to_string()) } }
+                tr { td { b { "Voting ends" } } td { (manifest.voting_end.to_string()) } }
                 tr { td { b { "# voters" } } td { (manifest.n_voters) } }
                 @for c in manifest.candidates.iter() {
                     tr { td { b { (c.name()) } } td { pre { (c.pubkey().to_pem().unwrap()) } } }

@@ -2,9 +2,8 @@ use crate::fetch::{election, get_manifest, get_results};
 use crate::{released_psephoi, retrieve_psephoi};
 use anyhow::Result;
 use gloo_utils::document;
-use jiff::Timestamp;
 use maud::{Markup, html};
-use psephoi::{NONCE_LEN, RegWhileVoting, SIG_LEN, render_manifest};
+use psephoi::{NONCE_LEN, RegWhileVoting, SIG_LEN, UnixSeconds, render_manifest};
 use rand::rng;
 use rand::seq::SliceRandom;
 use web_sys::Element;
@@ -20,7 +19,7 @@ pub async fn render() -> Result<Markup> {
         .collect::<Vec<_>>();
     candidates.shuffle(&mut rng());
 
-    let now = Timestamp::now();
+    let now = UnixSeconds::now();
     let voting = manifest.voting_period();
     let main = if now > voting.end {
         let results = get_results().await?;
@@ -153,7 +152,7 @@ pub async fn render() -> Result<Markup> {
         main {
             p #status-box { "" }
             (main)
-            (render_manifest(&manifest))
+            (render_manifest(manifest))
         }
     };
     Ok(markup)

@@ -2,7 +2,9 @@ use crate::{Candidate, register::RegWalItem, vote::VoteWalItem};
 use anyhow::{Context, Result, ensure};
 use jiff::Timestamp;
 use linearize::{LinearizeExt, StaticCopyMap};
-use psephoi::{CandidateManifest, ElectionManifest, KeyPair, NONCE_LEN, Phase, SIG_LEN};
+use psephoi::{
+    CandidateManifest, ElectionManifest, KeyPair, NONCE_LEN, Phase, SIG_LEN, UnixSeconds,
+};
 use rand::Rng;
 use std::{ops::Range, time::Duration};
 
@@ -92,8 +94,8 @@ impl ElectionConfig {
                 })
                 .collect(),
             n_voters: self.n_voters,
-            voting_start: self.voting_period.start.as_second() as u64,
-            voting_end: self.voting_period.end.as_second() as u64,
+            voting_start: UnixSeconds(self.voting_period.start.as_second() as u64),
+            voting_end: UnixSeconds(self.voting_period.end.as_second() as u64),
             reg_while_voting: if self.allow_reg_while_voting {
                 psephoi::RegWhileVoting::Allow
             } else {

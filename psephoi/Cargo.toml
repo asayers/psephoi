@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
-jiff.workspace = true
+jiff = { workspace = true, optional = true }
 base64ct.workspace = true
 maud.workspace = true
 linearize = { workspace = true, features = ["derive"] }
@@ -15,3 +15,7 @@ blind-rsa-signatures.workspace = true
 rand.workspace = true
 serde = { workspace = true, features = ["derive"] }
 tls_codec = { workspace = true, features = ["derive"] }
+js-sys = { workspace = true, optional = true }
+
+[features]
+js-sys = ["dep:js-sys"]

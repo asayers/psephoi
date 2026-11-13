@@ -18,11 +18,10 @@ gloo-events = "0.3.0"
 gloo-net.workspace = true
 gloo-storage.workspace = true
 gloo-utils = "0.3.0"
-jiff = { workspace = true, features = ["js"] }
 js-sys.workspace = true
 linearize.workspace = true
 maud.workspace = true
-psephoi.workspace = true
+psephoi = { workspace = true, features = ["js-sys"] }
 rand.workspace = true
 tls_codec.workspace = true
 tracing-subscriber.workspace = true

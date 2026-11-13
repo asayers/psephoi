@@ -16,7 +16,7 @@ linearize.workspace = true
 listenfd = "1.0.2"
 maud = { workspace = true, features = ["axum"] }
 mmap-snapshot = "0.3.0"
-psephoi.workspace = true
+psephoi = { workspace = true, features = ["jiff"] }
 rand.workspace = true
 roaring = { workspace = true, features = ["serde"] }
 ron.workspace = true
