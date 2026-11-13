@@ -22,7 +22,7 @@ blake3 = "1.8.7"
 blind-rsa-signatures = "0.18.0"
 console_error_panic_hook = "0.1.7"
 getrandom = "0.4"
-gloo-net = "0.7.0"
+gloo-net = { version = "0.7.0", default-features = false }
 gloo-storage = "0.4.0"
 jiff = "0.2.38"
 js-sys = "0.3"
