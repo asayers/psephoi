@@ -16,7 +16,6 @@ console_error_panic_hook.workspace = true
 getrandom = { workspace = true, features = ["wasm_js", "sys_rng"] }
 gloo-events = "0.3.0"
 gloo-net = { workspace = true, features = ["http"] }
-gloo-storage.workspace = true
 gloo-utils = "0.3.0"
 js-sys.workspace = true
 linearize.workspace = true

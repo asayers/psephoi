@@ -7,9 +7,9 @@ use crate::buttons::*;
 use crate::fetch::*;
 use crate::pre_psephoi::*;
 use crate::render::*;
+use anyhow::Context;
 use anyhow::{Result, anyhow};
 use base64ct::{Base64UrlUnpadded, Encoding};
-use gloo_storage::Storage;
 use gloo_utils::document;
 use psephoi::Psephoi;
 use tls_codec::Deserialize;
@@ -42,13 +42,12 @@ fn body() -> Result<Element> {
 async fn retrieve_psephoi() -> Result<Option<Psephoi>> {
     let election = election().await?;
     let storage_key = format!("psephoi_{}", election);
-    gloo_storage::LocalStorage::get::<String>(&storage_key)
-        .ok()
-        .map(|encoded| {
-            let bytes = Base64UrlUnpadded::decode_vec(&encoded)?;
-            Ok(Psephoi::tls_deserialize_exact(&bytes)?)
-        })
-        .transpose()
+    let val = local_storage()?.get_item(&storage_key).js()?;
+    val.map(|encoded| {
+        let bytes = Base64UrlUnpadded::decode_vec(&encoded)?;
+        Ok(Psephoi::tls_deserialize_exact(&bytes)?)
+    })
+    .transpose()
 }
 
 /// The union of all votes to date (for this election, by this voter)
@@ -58,7 +57,7 @@ async fn released_psephoi() -> Result<Vec<&'static str>> {
     let mut cs = vec![];
     for (i, c) in manifest.candidates.iter().enumerate() {
         let storage_key = format!("receipt_{}_{}", election, i);
-        if gloo_storage::LocalStorage::get::<String>(storage_key).is_ok() {
+        if local_storage()?.get_item(&storage_key).js()?.is_some() {
             cs.push(c.name());
         }
     }
@@ -75,4 +74,11 @@ impl<T> JsResultExt<T> for Result<T, JsValue> {
             Err(v) => anyhow!("{v:?}"),
         })
     }
+}
+
+fn local_storage() -> Result<web_sys::Storage> {
+    gloo_utils::window()
+        .local_storage()
+        .js()?
+        .context("localStorage unavailable")
 }

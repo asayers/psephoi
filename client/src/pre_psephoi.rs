@@ -1,8 +1,10 @@
-use crate::fetch::{election, get_manifest};
+use crate::{
+    JsResultExt,
+    fetch::{election, get_manifest},
+};
 use anyhow::Result;
 use base64ct::{Base64UrlUnpadded, Encoding};
 use blind_rsa_signatures::{BlindMessage, BlindingResult, Secret};
-use gloo_storage::Storage;
 use psephoi::NONCE_LEN;
 use tls_codec::{
     Deserialize, Serialize, TlsByteVecU16, TlsDeserialize, TlsSerialize, TlsSize, TlsVecU16,
@@ -44,7 +46,11 @@ pub async fn ensure_pre_psephoi_exist() -> Result<()> {
     let manifest = get_manifest().await?;
 
     let storage_key = format!("pre_psephoi_{}", election);
-    if gloo_storage::LocalStorage::get::<String>(&storage_key).is_ok() {
+    if crate::local_storage()?
+        .get_item(&storage_key)
+        .js()?
+        .is_some()
+    {
         return Ok(());
     }
 
@@ -65,14 +71,17 @@ pub async fn ensure_pre_psephoi_exist() -> Result<()> {
         })
         .collect::<Result<TlsVecU16<_>>>()?;
     let encoded = Base64UrlUnpadded::encode_string(&pre_psephoi.tls_serialize_detached()?);
-    gloo_storage::LocalStorage::set(storage_key, encoded).unwrap();
-    Ok(())
+    crate::local_storage()?
+        .set_item(&storage_key, &encoded)
+        .js()
 }
 
 pub async fn get_pre_psephoi() -> Result<Vec<PrePsephos>> {
     let election = election().await?;
     let storage_key = format!("pre_psephoi_{}", election);
-    let encoded = gloo_storage::LocalStorage::get::<String>(&storage_key)?;
+    let Some(encoded) = crate::local_storage()?.get_item(&storage_key).js()? else {
+        return Ok(vec![]);
+    };
     let bytes = Base64UrlUnpadded::decode_vec(&encoded)?;
     Ok(TlsVecU16::<PrePsephos>::tls_deserialize_exact(&bytes)?.into_vec())
 }

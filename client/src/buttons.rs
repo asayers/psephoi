@@ -11,7 +11,6 @@ use anyhow::{Context, Result, anyhow, bail, ensure};
 use base64ct::{Base64UrlUnpadded, Encoding};
 use gloo_events::EventListener;
 use gloo_net::http::Request;
-use gloo_storage::Storage;
 use gloo_utils::document;
 use gloo_utils::window;
 use linearize::Linearize;
@@ -77,6 +76,7 @@ pub async fn wire_up_buttons() {
 
 async fn register() -> Result<bool> {
     let election = election().await?;
+    let manifest = get_manifest().await?;
 
     ensure!(
         retrieve_psephoi().await?.is_none(),
@@ -84,8 +84,7 @@ async fn register() -> Result<bool> {
     );
 
     let pre_psephoi = get_pre_psephoi().await?;
-
-    let manifest = get_manifest().await?;
+    ensure!(manifest.candidates.len() == pre_psephoi.len());
 
     let token = window().location().hash().js()?;
     let token = RegToken::from_bytes(&Base64UrlUnpadded::decode_vec(
@@ -135,7 +134,9 @@ async fn register() -> Result<bool> {
     );
     let encoded = Base64UrlUnpadded::encode_string(&psephoi.to_bytes());
     let storage_key = format!("psephoi_{}", election);
-    gloo_storage::LocalStorage::set(storage_key, encoded).unwrap();
+    crate::local_storage()?
+        .set_item(&storage_key, &encoded)
+        .js()?;
     Ok(true)
 }
 
@@ -164,7 +165,9 @@ async fn vote() -> Result<bool> {
                 psephos: p.clone(),
             };
             // Record the intent to send, replace it with the actual receipt when we get it
-            gloo_storage::LocalStorage::set(&storage_key, "leaked").unwrap();
+            crate::local_storage()?
+                .set_item(&storage_key, "leaked")
+                .js()?;
             let path = format!("/{election}/vote");
             let resp = Request::post(&path).body(req.to_bytes())?.send().await?;
             if !resp.ok() {
@@ -175,7 +178,9 @@ async fn vote() -> Result<bool> {
             let resp = VoteResponse::from_bytes(&resp)?;
             // TODO: Verify that the recipt is properly signed
             let encoded = Base64UrlUnpadded::encode_string(&resp.receipt);
-            gloo_storage::LocalStorage::set(storage_key, encoded).unwrap();
+            crate::local_storage()?
+                .set_item(&storage_key, &encoded)
+                .js()?;
         }
     }
     Ok(true)
@@ -187,7 +192,7 @@ async fn verify() -> Result<bool> {
     let manifest = get_manifest().await?;
     let results = get_results().await?;
 
-    assert_eq!(results.candidates.len(), manifest.candidates.len());
+    ensure!(results.candidates.len() == manifest.candidates.len());
     // TODO: Check signature
     for ((i, c), p) in results.candidates.iter().enumerate().zip(psephoi.0.iter()) {
         let status = document()
@@ -196,7 +201,7 @@ async fn verify() -> Result<bool> {
         status.set_text_content(Some("Verifying..."));
 
         let storage_key = format!("receipt_{}_{}", election, i);
-        let receipt = gloo_storage::LocalStorage::get::<String>(&storage_key).ok();
+        let receipt = crate::local_storage()?.get_item(&storage_key).js()?;
 
         let path = format!("/{election}/nonces/{i}");
         let resp = Request::get(&path).send().await?;
@@ -205,17 +210,18 @@ async fn verify() -> Result<bool> {
         }
         let resp = resp.binary().await?;
         let hash = blake3::hash(&resp);
-        assert_eq!(resp.len(), c.tally as usize * NONCE_LEN);
-        assert_eq!(hash.as_bytes(), &c.nonces);
+        ensure!(resp.len() == c.tally as usize * NONCE_LEN);
+        ensure!(hash.as_bytes() == &c.nonces);
         let nonces =
             <[[u8; NONCE_LEN]]>::ref_from_bytes(&resp).map_err(|_| anyhow!("Bad nonce file"))?;
         for [x, y] in nonces.array_windows::<2>() {
             assert!(x < y); // Strictly less => no duplicates
         }
         let is_present = nonces.binary_search(&p.token).ok();
-        let txt = match (receipt, is_present) {
+        let txt = match (receipt.as_deref(), is_present) {
             (Some(_), Some(_)) => "✅".into(),
             (None, None) => "✅".into(),
+            (Some("leaked"), None) => "❌ The ballot counter didn't accept your vote!".into(),
             (Some(receipt), None) => {
                 format!("❌ The ballot counter threw away your vote!  Here's the proof: {receipt}")
             }
