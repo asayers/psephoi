@@ -4,7 +4,7 @@ An implementation of approval voting which is:
 
 * **Verifiable**: You can prove that your vote was included in the tally
 * **Secret**: No-one else can tell how you voted (not even the server operator)
-* Relatively **low-tech**: It uses well-known crypto only
+* Fairly **low-tech**: No fancy crypto required; you should be able to understand it
 
 ## Introduction
 
@@ -20,18 +20,6 @@ vote to be publically known!  So here's the puzzle: we need to set things up so
 that voters can verify the correctness of _their own_ vote, without being able
 to see how _anyone else_ voted.  An interesting one!
 
-### Existing methods
-
-This is a problem which has been extensively studied, and there are even methods
-which have been used for real. My problem with these methods is that they're
-too complicated!  They use niche crypto, lacking standard implementations.  The
-code is all bespoke, and - guess what - buggy!  It doesn't matter what nice
-properties your system has if no-one can implement it correctly.
-
-<!-- (Citation needed) -->
-
-<!-- For some examples, take a look at Helios, Scantegrity, ThreeBallot, Pret a Voter, and Scytl. -->
-
 ### Online voting
 
 Many existing methods rely on a physical polling station.  There's nothing wrong
@@ -39,10 +27,13 @@ with this per-se, but I'm interested to see how far we can get without one.
 Needless to say, if people can vote on their phone, or via a website, it lowers
 the barrier to entry for vote organisers.
 
-Note that a physical polling station is probably the only real way to prevent
-direct physical coersion.  If you can vote using an app on your phone, a
-controlling father can always watch his children submit their vote.  That said,
-see the section on "vote buying" for a potential mitigation.
+Note that a polling station is probably the only real way to prevent direct
+physical coersion.  If you can vote using an app on your phone, a [controlling
+parent][family voting] can always watch their children submit their vote
+(for example).  That said, see the section on "vote buying" for a potential
+mitigation.
+
+[family voting]: https://en.wikipedia.org/wiki/Family_voting
 
 ### Approval voting
 
@@ -56,28 +47,46 @@ You don't often see this style of voting amongst high-profile elections, but
 it's popular amongst voting theorists.  It also has the property of being
 extremely simple, and I want to know whether that simplicity can be exploited.
 
+### Existing methods
+
+The question of verifiable and secret elections has been extensively studied.
+There are many proposed methods, and some of them have even been used for real
+elections.  My problem with these methods is that they're too complicated!  They
+use niche crypto with no standard implementations, so the code is all bespoke
+and hard to audit.
+This is not just my opinion: there's [a history in bugs][bugs] in these systems
+which undermine the claimed properties.
+
+[bugs]: https://www.microsoft.com/en-us/research/video/how-not-to-prove-your-election-outcome/
+
+<!-- For some examples, take a look at Helios, Scantegrity, ThreeBallot, Pret a Voter, and Scytl. -->
+
+So my goal is a scheme that any programmer can understand and implement, at
+least in a basic unhardened form.  A production-ready implementation still
+requires care of course (eg. to avoid side-channels), but it should still be
+easy enough to see whether it implements the core scheme correctly.
+
 ## The plan
 
 ### Overview
 
-Ok, so here's my plan: it's a two-phase election, with a "registration"
-phase and a "voting" phase.
-
-In the registration phase, voters go to the _registrar_, identify themselves as
-an eligible voter, and receive some voting tokens.  Each voter gets one token
-per candidate, whether they intend to vote for them or not; so for example if
-there are 100 voters and 3 candidates, the registrar will issue 300 tokens in
-total.
+You start by registering to vote.  To do so, you must identify yourself to the
+_registrar_, which checks that you're eligible to vote.  It will then issue
+you a set of voting tokens.  You get one token per candidate, no matter who you
+intend to vote for.  So, for example, if there are 100 voters and 3 candidates,
+the registrar will issue 300 tokens in total.
 
 A token represents a potential vote.  Tokens are clearly linked to a specific
 candidate (and to a specific election), and can only be used to vote for that
 candidate (and in that election).  Voters in possession of a token can choose
 whether to destroy it or make it public.
 
-In the voting phase, voters publish the tokens for the candidates they like,
-and delete the tokens for the candidates they dislike.  All published tokens are
-collected by the _ballot counter_.  Once the voting phase is over, the ballot
-counter pushlishes the list of tokens they collected.
+The _ballot counter_ records any tokens which are sent to it.  For any
+candidates you like, send that candidate's token to the ballot counter.  For
+any candidates you _dislike_, keep the token secret until the election is over
+(you can just delete them if you want).  Once the election is over, the ballot
+counter publishes the list of tokens they collected, and that's the result of
+the election.
 
 Voters can verify for themselves that their published tokens are indeed on
 the list, and that their unpublished tokens are not.  In addition, anyone can
@@ -87,35 +96,52 @@ valid and unique.
 ### Tokens and secrecy
 
 What _are_ these tokens, exactly?  A token is a random number plus a
-cryptographic signature.  When the election is announced, the registrar creates
-a number of keypairs---one per candidate.  A random number signed with one of
-these keypairs can be used to vote for the corresponding candidate.  The public
-keys are published, so when you receive your tokens you can check that you got
-one valid token for each candidate.
+cryptographic signature.
 
-When you actually make your vote, you submit your tokens to the ballot counter
-anonymously.  You can use tor or OHTTP or something if you like.  But the
-registrar knows who you are, because you had to authenticate to receive your
-tokens.  What's to stop the registrar from remembering what tokens it gave to
-whom, and later putting the pieces together and figuring out who you voted for?
+When the election is announced, the registrar generates one keypair per
+candidate, and announces the public keys.  Any number signed with a candidate's
+key can be used to vote for that candidate.  When you collect your tokens you
+can check that you got one valid token for each candidate.
+
+When you make your vote, you anonymously submit some tokens to the ballot
+counter.  You can use tor or OHTTP to avoid exposing your IP.  But what about
+the registrar?  It knows who you are; what's to stop it from remembering the
+tokens it gave you and observing your vote?
 
 There's a technique called "blind-signing".  In a blind-signing protocol, the
 signer doesn't get to see what they're signing.  The classic analogy is an
 envelope lined with carbon paper. The voter generates a random number and puts
-it in an envelope; the registrar signs the envelope, without opening it. then
+it in an envelope; the registrar signs the envelope, without opening it; then
 the voter unseals the envelope and voila: they have a random number signed by
 the registrar, but the registrar doesn't know what it is!
 
-The technique was introduced by David Chaum in 1983, but lay dormant (as far as
-I know) until people suddenly started noticing it in 2021.  (That's also when I
-wrote the first draft of this document.) The crypto was standardized by the IETF
-in 2023 ([RFC 9474]), and work to incorporate it into the browser (Privacy Pass)
-is [ongoing][privacypass].
+The technique was introduced by David Chaum in 1983, but was relatively little
+used until 2021 when people (myself included) suddenly started taking notice of
+it.  The crypto was standardized by the IETF in 2023 ([RFC 9474]), and work to
+incorporate it into the browser (Privacy Pass) is [ongoing][privacypass].  There
+are multiple implementations available, and I think it's fair to say that it
+numbers amonst the well-known techniques in crypto at this point.
 
 [RFC 9474]: https://www.rfc-editor.org/info/rfc9474/
 [privacypass]: https://datatracker.ietf.org/wg/privacypass/about/
 
-### Efficient verification
+### Election phases
+
+The registrar knows who you are.  If it sees you collecting your tokens, and
+then milliseconds later someone publishes their vote, the registrar can put two
+and two together and make a confident guess that it was you voting.
+
+To avoid this we break the election into two phases: the "registration" phase,
+where voters collect their tokens, and the "voting" phase, where they publish
+the tokens they want to publish.  If these phases don't overlap, then it's
+impossible to correlate registrations with votes.
+
+(In this implementation, disjoint phases are optional, but should only be
+disabled when secrecy is not required.)
+
+## Implementation details
+
+### Efficient verification, take 1
 
 The expectation is that most people will want to check their tokens after the
 vote is finished, so we need to make this operation efficient.  Here's how:
